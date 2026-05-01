@@ -11,6 +11,7 @@ It outputs a colour-coded report straight to the terminal and saves a JSON file 
 | Check | Description |
 |-------|-------------|
 | S3 public access | Flags buckets with public ACLs or overly permissive bucket policies |
+| S3 default encryption | Flags buckets that do not encrypt new objects by default |
 | IAM wildcard policies | Finds attached policies that grant `*:*` or `Action: *` |
 | Root MFA | Warns if the root account doesn't have MFA enabled |
 | Open security groups | Finds SGs allowing `0.0.0.0/0` inbound on risky ports (22, 3389, etc.) |
@@ -62,6 +63,7 @@ Region  : eu-west-2
 
 [S3]
   ✗ FAIL  my-public-bucket         — public access not blocked (ACL: public-read)
+  ✗ FAIL  logs-bucket              — default encryption is not enabled
   ✓ PASS  my-private-bucket
 
 [IAM]

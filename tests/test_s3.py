@@ -7,7 +7,12 @@ Using moto to mock AWS — no real credentials needed.
 from unittest.mock import MagicMock
 from botocore.exceptions import ClientError
 
-from scanner.checks.s3 import run, _check_public_access_block, _check_bucket_policy
+from scanner.checks.s3 import (
+    run,
+    _check_public_access_block,
+    _check_bucket_policy,
+    _check_bucket_encryption,
+)
 
 
 def _make_client_error(code: str, message: str = "test error") -> ClientError:
@@ -100,6 +105,47 @@ class TestBucketPolicy:
         assert findings == []
 
 
+class TestBucketEncryption:
+    def test_fail_when_default_encryption_missing(self):
+        client = MagicMock()
+        client.get_bucket_encryption.side_effect = _make_client_error(
+            "ServerSideEncryptionConfigurationNotFoundError"
+        )
+        findings = _check_bucket_encryption(client, "plain-bucket")
+        assert len(findings) == 1
+        assert findings[0].status == "FAIL"
+        assert "default encryption" in findings[0].message
+
+    def test_pass_when_default_encryption_enabled(self):
+        client = MagicMock()
+        client.get_bucket_encryption.return_value = {
+            "ServerSideEncryptionConfiguration": {
+                "Rules": [{
+                    "ApplyServerSideEncryptionByDefault": {
+                        "SSEAlgorithm": "aws:kms",
+                    }
+                }]
+            }
+        }
+        findings = _check_bucket_encryption(client, "kms-bucket")
+        assert len(findings) == 1
+        assert findings[0].status == "PASS"
+        assert "aws:kms" in findings[0].message
+
+    def test_fail_when_encryption_rule_has_no_algorithm(self):
+        client = MagicMock()
+        client.get_bucket_encryption.return_value = {
+            "ServerSideEncryptionConfiguration": {
+                "Rules": [{
+                    "ApplyServerSideEncryptionByDefault": {}
+                }]
+            }
+        }
+        findings = _check_bucket_encryption(client, "broken-encryption-bucket")
+        assert len(findings) == 1
+        assert findings[0].status == "FAIL"
+
+
 class TestRunFunction:
     def test_run_returns_findings_for_each_bucket(self):
         session = MagicMock()
@@ -119,8 +165,17 @@ class TestRunFunction:
             }
         }
         mock_s3.get_bucket_policy.side_effect = _make_client_error("NoSuchBucketPolicy")
+        mock_s3.get_bucket_encryption.return_value = {
+            "ServerSideEncryptionConfiguration": {
+                "Rules": [{
+                    "ApplyServerSideEncryptionByDefault": {
+                        "SSEAlgorithm": "AES256",
+                    }
+                }]
+            }
+        }
 
         findings = run(session)
-        # 2 buckets × 1 PASS finding each from public access block check
-        assert len(findings) == 2
+        # 2 buckets × 2 PASS findings each from public access block + encryption
+        assert len(findings) == 4
         assert all(f.status == "PASS" for f in findings)
