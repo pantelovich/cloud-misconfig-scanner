@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Reports
+misconfig_report_*.json
+
+# Secrets — just in case
+.env
+*.pem
+*.key
+credentials
+
+# Mac
+.DS_Store
